@@ -324,6 +324,54 @@ int CacheDestroy (Cache_t *cache)
 	return (EOK);
 }
 
+void dump_cache_stats(Cache_t *cache){
+    /* ===== DEBUG: dump cache state ===== */
+        fprintf(stderr, "\n=== CACHE STATE AT FAILURE ===\n");
+        fprintf(stderr, "FreeSize: %u\n", cache->FreeSize);
+        
+        uint32_t total_tags = 0;
+        uint32_t busy_tags = 0;
+        uint32_t lru_tags = 0;
+        uint32_t with_buffer = 0;
+        
+        /* Walk the hash table */
+        for (uint32_t h = 0; h < cache->HashSize; h++) {
+            Tag_t *t = cache->Hash[h];
+            while (t != NULL) {
+                total_tags++;
+                if (t->Buffer != NULL) with_buffer++;
+                if (t->Refs > 0) busy_tags++;
+                fprintf(stderr, "  offset=%llu refs=%u buf=%p flags=0x%x\n",
+                        (unsigned long long)t->Offset, t->Refs, t->Buffer, t->Flags);
+                t = t->Next;
+            }
+        }
+        
+        /* Walk the LRU list */
+        LRUNode_t *n = cache->LRU.Head.Next;
+        while (n != &cache->LRU.Head) {
+            lru_tags++;
+            n = n->Next;
+        }
+        
+        /* Walk the Busy list */
+        uint32_t busy_list_count = 0;
+        n = cache->LRU.Busy.Next;
+        while (n != &cache->LRU.Busy) {
+            busy_list_count++;
+            n = n->Next;
+        }
+        
+        fprintf(stderr, "=== SUMMARY ===\n");
+        fprintf(stderr, "Total tags in hash: %u\n", total_tags);
+        fprintf(stderr, "Tags with buffer:   %u\n", with_buffer);
+        fprintf(stderr, "Tags with Refs > 0: %u\n", busy_tags);
+        fprintf(stderr, "Tags in LRU list:   %u\n", lru_tags);
+        fprintf(stderr, "Tags in Busy list:  %u\n", busy_list_count);
+        fprintf(stderr, "================\n\n");
+        /* ===== END DEBUG ===== */
+}
+
 /*
  * CacheRead
  *
@@ -358,9 +406,7 @@ int CacheRead (Cache_t *cache, uint64_t off, uint32_t len, Buf_t **bufp)
 	
 	/* get a free buffer */
 	if ((buf = cache->FreeBufs) == NULL) {
-#if CACHE_DEBUG
-		fsck_print(ctx, LOG_TYPE_INFO, "ERROR: CacheRead: no more bufs!\n");
-#endif
+        fsck_print(ctx, LOG_TYPE_ERROR, "ERROR: CacheRead: no more bufs!\n");
 		return (ENOBUFS);
 	}
 	cache->FreeBufs = buf->Next; 
@@ -384,8 +430,9 @@ int CacheRead (Cache_t *cache, uint64_t off, uint32_t len, Buf_t **bufp)
 #endif
 	error = CacheLookup (cache, cblk, &tag);
 	if (error != EOK) {
+        fsck_print(ctx, LOG_TYPE_ERROR, "ERROR: CacheRead: CacheLookup error %d\n", error);
 #if CACHE_DEBUG
-		fsck_print(ctx, LOG_TYPE_INFO, "ERROR: CacheRead: CacheLookup error %d\n", error);
+        dump_cache_stats(cache);
 #endif
 		return (error);
 	}
@@ -1287,9 +1334,7 @@ int CacheLookup (Cache_t *cache, uint64_t off, Tag_t **tag)
 			/* Try again */
 			temp->Buffer = CacheAllocBlock (cache);
 			if (temp->Buffer == NULL) {
-#if CACHE_DEBUG
-				fsck_print(ctx, LOG_TYPE_INFO, "%s(%d):  CacheAllocBlock failed (FreeHead = %p, FreeSize = %u)\n", __FUNCTION__, __LINE__, cache->FreeHead, cache->FreeSize);
-#endif
+				fsck_print(ctx, LOG_TYPE_ERROR, "%s(%d):  CacheAllocBlock failed (FreeHead = %p, FreeSize = %u)\n", __FUNCTION__, __LINE__, cache->FreeHead, cache->FreeSize);
 				return (ENOMEM);
 			}
 		}

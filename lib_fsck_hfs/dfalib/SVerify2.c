@@ -902,81 +902,69 @@ Output:		*btStat		- bit mask S_UnusedNodesNotZero
 			0 = no error
 			n = error
 ------------------------------------------------------------------------------*/
-
+int CacheRawRead (Cache_t *cache, uint64_t off, uint32_t len, void *buf); // Quick function prototype
 int BTCheckUnusedNodes(SGlobPtr GPtr, short fileRefNum, UInt16 *btStat)
 {
-	BTreeControlBlock *btcb	= GetBTreeControlBlock(fileRefNum);
-	unsigned char *bitmap = (unsigned char *) ((BTreeExtensionsRec*)btcb->refCon)->BTCBMPtr;
-	unsigned char mask = 0x80;
-	OSErr err;
-	UInt32 nodeNum;
-	BlockDescriptor node;
-	
-	node.buffer = NULL;
-	
-	for (nodeNum = 0; nodeNum < btcb->totalNodes; ++nodeNum)
-	{
-		if ((*bitmap & mask) == 0)
-		{
-			UInt32 i;
-			UInt32 bufferSize;
-			UInt32 *buffer;
-			
-			/* Read the raw node, without going through hfs_swap_BTNode. */
-			err = btcb->getBlockProc(btcb->fcbPtr, nodeNum, kGetBlock, &node);
-			if (err)
-			{
-				if (state.debug) fsck_print(ctx, LOG_TYPE_INFO, "Couldn't read node #%u\n", nodeNum);
-				return err;
-			}
-			
-			/*
-			 * Make sure node->blockSize bytes at address node->buffer are zero.
-			 */
-			buffer = (UInt32 *) node.buffer;
-			bufferSize = node.blockSize / sizeof(UInt32);
-			
-			for (i = 0; i < bufferSize; ++i)
-			{
-				if (buffer[i])
-				{
-					*btStat |= S_UnusedNodesNotZero;
-					GPtr->TarBlock = nodeNum;
-					fsckPrintFormat(GPtr->context, E_UnusedNodeNotZeroed, nodeNum);
-										
-					if (!state.debug)
-					{
-						/* Stop now; repair will zero all unused nodes. */
-						goto done;
-					}
-					
-					/* No need to check the rest of this node. */
-					break;
-				}
-			}
-			
-			/* Release the node without going through hfs_swap_BTNode. */
-			(void) btcb->releaseBlockProc(btcb->fcbPtr, &node, kReleaseBlock);
-			node.buffer = NULL;
-		}
-		
-		/* Move to the next bit in the bitmap. */
-		mask >>= 1;
-		if (mask == 0)
-		{
-			mask = 0x80;
-			++bitmap;
-		}
-	}
+    BTreeControlBlock *btcb = GetBTreeControlBlock(fileRefNum);
+    unsigned char *bitmap = (unsigned char *) ((BTreeExtensionsRec*)btcb->refCon)->BTCBMPtr;
+    unsigned char mask = 0x80;
+    OSErr err;
+    UInt32 nodeNum;
+    UInt32 nodeSize = btcb->nodeSize;
+    
+    /* Allocate a single reusable buffer for the entire scan — no cache pollution */
+    UInt32 *buffer = (UInt32 *)malloc(nodeSize);
+    if (buffer == NULL) return ENOMEM;
+    
+    Cache_t *cache = (Cache_t *)btcb->fcbPtr->fcbVolume->vcbBlockCache;
+    
+    for (nodeNum = 0; nodeNum < btcb->totalNodes; ++nodeNum)
+    {
+        if ((*bitmap & mask) == 0)
+        {
+            UInt64 diskBlock;
+            UInt32 contiguousBytes;
+            
+            /* Resolve file offset to disk offset */
+            err = MapFileBlockC(btcb->fcbPtr->fcbVolume, btcb->fcbPtr, nodeSize,
+                                ((UInt64)nodeNum * nodeSize) >> kSectorShift,
+                                &diskBlock, &contiguousBytes);
+            if (err) {
+                if (state.debug) fsck_print(ctx, LOG_TYPE_INFO,
+                    "Couldn't map node #%u\n", nodeNum);
+                free(buffer);
+                return err;
+            }
+            
+            /* Direct read bypassing the block cache */
+            err = CacheRawRead(cache, diskBlock << kSectorShift, nodeSize, buffer);
+            if (err) {
+                if (state.debug) fsck_print(ctx, LOG_TYPE_INFO, "Couldn't read node #%u\n", nodeNum);
+                free(buffer);
+                return err;
+            }
+            
+            /* Verify node is all zeros */
+            UInt32 bufferSize = nodeSize / sizeof(UInt32);
+            for (UInt32 i = 0; i < bufferSize; ++i) {
+                if (buffer[i]) {
+                    *btStat |= S_UnusedNodesNotZero;
+                    GPtr->TarBlock = nodeNum;
+                    fsckPrintFormat(GPtr->context, E_UnusedNodeNotZeroed, nodeNum);
+                    if (!state.debug) goto done;
+                    break;
+                }
+            }
+        }
+        
+        mask >>= 1;
+        if (mask == 0) { mask = 0x80; ++bitmap; }
+    }
+    
 done:
-	if (node.buffer)
-	{
-		(void) btcb->releaseBlockProc(btcb->fcbPtr, &node, kReleaseBlock);
-	}
-	
-	return 0;
-} /* end BTCheckUnusedNodes */
-
+    free(buffer);
+    return noErr;
+}
 
 
 /*------------------------------------------------------------------------------
