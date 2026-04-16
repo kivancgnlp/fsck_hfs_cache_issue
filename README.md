@@ -1,9 +1,11 @@
 # fsck_hfs — Cache Bug Fix Fork
 
 This fork patches a cache-corruption bug in `BTCheckUnusedNodes` that caused
-`fsck_hfs` to hang or produce incorrect results on certain HFS+ volumes. The
-function has been rewritten to bypass the block cache entirely and read unused
-B-tree nodes directly from disk. See [CHANGES.md](CHANGES.md) for a full change log.
+`fsck_hfs` to hang or produce incorrect results on large HFS+ volumes (≥ 24 TB)
+on Macs with low memory (≤ 8 GB RAM). Under these conditions the block cache is
+exhausted while scanning unused B-tree nodes, leading to incorrect behaviour.
+The function has been rewritten to bypass the block cache entirely and read
+unused B-tree nodes directly from disk. See [CHANGES.md](CHANGES.md) for a full change log.
 
 ---
 
