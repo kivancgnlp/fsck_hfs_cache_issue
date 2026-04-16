@@ -1386,7 +1386,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				4DFD9472153601F50039B6BA /* CoreFoundation.framework in Frameworks */,
-				CE8267A92CEF50D20019C139 /* FSKit.framework in Frameworks */,
 				CED34AE32D008ED80057F6DB /* IOKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -3860,7 +3859,7 @@
 				);
 				INSTALLHDRS_COPY_PHASE = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx watchos watchsimulator xros xrsimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -4804,7 +4803,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = fsck_hfs/fsck_hfs.ios.entitlements;
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = fsck_hfs/fsck_hfs.osx.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "";
 				CODE_SIGN_IDENTITY = "-";
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"BSD=1",
@@ -4813,7 +4812,7 @@
 				);
 				INSTALLHDRS_COPY_PHASE = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx watchos watchsimulator xros xrsimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -7244,6 +7243,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = fsck_hfs/fsck_hfs.ios.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "-";
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"BSD=1",
@@ -7252,7 +7252,7 @@
 				);
 				INSTALLHDRS_COPY_PHASE = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx watchos watchsimulator xros xrsimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -7542,7 +7542,7 @@
 				);
 				INSTALLHDRS_COPY_PHASE = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx.internal;
+				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx watchos watchsimulator xros xrsimulator";
 				SUPPORTS_MACCATALYST = NO;
